@@ -1,91 +1,73 @@
-import { useEffect, useState } from "react";
-import { signInWithRedirect, signOut, fetchAuthSession } from "aws-amplify/auth";
-import { obtenerCatalogo, type Skate } from "./api";
-import { isConfigOk, configFaltante } from "./config";
-import "./App.css";
+// Archivo: src/App.tsx (Ejemplo de estructura)
+import { useState } from 'react';
+// ... importaciones de tu librería de autenticación si las tienes ...
+import './App.css';
 
 function App() {
-  const [logueado, setLogueado] = useState(false);
-  const [cargandoSesion, setCargandoSesion] = useState(true);
-  const [catalogo, setCatalogo] = useState<Skate[]>([]);
-  const [cargandoCatalogo, setCargandoCatalogo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Supongamos que tienes un estado de autenticación (luego lo integras)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    if (!isConfigOk) {
-      setCargandoSesion(false);
-      return;
-    }
-    fetchAuthSession()
-      .then((session) => setLogueado(!!session.tokens))
-      .catch(() => setLogueado(false))
-      .finally(() => setCargandoSesion(false));
-  }, []);
+  const handleLogin = () => {
+    // Lógica de redirección o apertura del modal de Cognito
+    console.log("Redirigiendo a Cognito...");
+    // Para probar el cambio de estado visual, descomenta la siguiente línea:
+    // setIsAuthenticated(true);
+  };
 
-  useEffect(() => {
-    if (!logueado) return;
-    setCargandoCatalogo(true);
-    setError(null);
-    obtenerCatalogo()
-      .then(setCatalogo)
-      .catch((err) => setError(err.message))
-      .finally(() => setCargandoCatalogo(false));
-  }, [logueado]);
-
-  if (!isConfigOk) {
+  if (isAuthenticated) {
+    // ESTA ES LA VISTA DEL CATÁLOGO (QUE AÚN NO ME HAS MOSTRADO)
     return (
-      <div className="aviso-config">
-        <h1>Falta configuración</h1>
-        <p>
-          Completa estos valores en <code>.env</code> (Contexto Cognito externo):
-        </p>
-        <ul>
-          {configFaltante().map((clave) => (
-            <li key={clave}>
-              <code>{clave}</code>
-            </li>
-          ))}
-        </ul>
+      <div className="catalog-view">
+        <h1>Catálogo de Skates (Pronto)</h1>
+        {/* Aquí iría tu grilla de productos cuando la tengas */}
       </div>
     );
   }
 
+  // ESTA ES LA VISTA DE LOGIN (LA QUE VEMOS AHORA)
+  // TRANSFORMADA EN UN HERO SECTION PROFESIONAL
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Skate — Tienda</h1>
-        {!cargandoSesion &&
-          (logueado ? (
-            <button onClick={() => signOut()}>Cerrar sesión</button>
-          ) : (
-            <button onClick={() => signInWithRedirect()}>Iniciar sesión</button>
-          ))}
+    <div className="app-container">
+      {/* Barra de navegación superior (Similar a la referencia) */}
+      <header className="store-header">
+        <div className="logo-container">
+          <h1 className="app-logo">Skate — Tienda</h1>
+        </div>
+        <nav className="header-nav">
+          <span>Tablas</span>
+          <span>Ruedas</span>
+          <span>Accesorios</span>
+        </nav>
+        <div className="user-actions">
+          <button className="btn-login" onClick={handleLogin}>
+            Iniciar Sesión
+          </button>
+        </div>
       </header>
 
-      {cargandoSesion && <p>Verificando sesión…</p>}
-      {!cargandoSesion && !logueado && <p className="mensaje">Inicia sesión como cliente para ver el catálogo.</p>}
-
-      {logueado && (
-        <main>
-          {cargandoCatalogo && <p>Cargando catálogo…</p>}
-          {error && <p className="error">Error al cargar el catálogo: {error}</p>}
-          {!cargandoCatalogo && !error && catalogo.length === 0 && (
-            <p className="mensaje">No hay skates en el inventario todavía.</p>
-          )}
-          <div className="grid-catalogo">
-            {catalogo.map((z) => (
-              <article key={z.id} className="tarjeta">
-                <h2>{z.modelo}</h2>
-                <p className="marca">{z.marca}</p>
-                <p>Medida: {z.medida}</p>
-                <p className={z.stock > 0 ? "stock-ok" : "stock-agotado"}>
-                  {z.stock > 0 ? `${z.stock} en stock` : "Agotado"}
-                </p>
-              </article>
-            ))}
+      {/* Contenido Principal: El Hero Section Urbano */}
+      <main className="hero-section">
+        <div className="hero-content">
+          {/* Puedes agregar un mensaje de marketing aquí */}
+          <div className="hero-tagline">
+            <h2>¡Pasión por el asfalto!</h2>
+            <p>Autentica tu cuenta para acceder al mejor material.</p>
           </div>
-        </main>
-      )}
+          
+          {/* Tu botón actual de logueo, pero más estilizado */}
+          <div className="login-prompt">
+            <button className="btn-action-large" onClick={handleLogin}>
+              Iniciar sesión como cliente
+            </button>
+            <p className="login-subtext">Accede a tu cuenta para ver el catálogo completo y ofertas exclusivas.</p>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer opcional */}
+      <footer className="store-footer">
+        <p>© 2023 Skate — Tienda. Todos los derechos reservados.</p>
+      </footer>
     </div>
   );
 }
