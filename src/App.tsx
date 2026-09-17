@@ -13,9 +13,6 @@ function App() {
   const [autenticado, setAutenticado] = useState(() => Boolean(localStorage.getItem("skates-token")));
   const [errorLogin, setErrorLogin] = useState<string | null>(null);
 
-  // NUEVO ESTADO: Controla si se muestra el formulario de inicio de sesión
-  const [mostrandoLogin, setMostrandoLogin] = useState(false);
-
   useEffect(() => {
     if (!autenticado) return;
     obtenerCatalogo()
@@ -24,127 +21,25 @@ function App() {
       .finally(() => setCargando(false));
   }, [autenticado]);
 
-  const handleLoginSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    iniciarSesion(usuario, clave)
-      .then(() => setAutenticado(true))
-      .catch(() => setErrorLogin("Credenciales inválidas"));
-  };
-
-  // 1. SI DA CLIC EN INICIAR SESIÓN: Muestra el formulario con el botón de volver arreglado
-  if (!autenticado && mostrandoLogin) {
+  if (!autenticado) {
     return (
-      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', backgroundColor: '#090a0f', color: '#94a3b8' }}>
-        <form 
-          onSubmit={handleLoginSubmit} 
-          style={{ width: 'min(420px, 90vw)', padding: '40px', backgroundColor: '#13151a', borderRadius: '14px', border: '1px solid rgba(249, 115, 22, 0.4)', boxShadow: '0 25px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(249, 115, 22, 0.1)', boxSizing: 'border-box', position: 'relative' }}
-        >
-          {/* Botón de volver corregido y estilizado */}
-          <button 
-            type="button" 
-            onClick={() => setMostrandoLogin(false)}
-            style={{ 
-              position: 'absolute', 
-              top: '20px', 
-              right: '20px', 
-              background: 'transparent', 
-              border: '1px solid #27272a', 
-              borderRadius: '6px',
-              color: '#94a3b8', 
-              cursor: 'pointer', 
-              fontSize: '11px', 
-              fontWeight: 700,
-              padding: '6px 12px',
-              letterSpacing: '1px',
-              boxShadow: 'none',
-              textTransform: 'uppercase'
-            }}
-          >
-            ← Volver
-          </button>
-
-          <p style={{ color: '#f97316', fontWeight: 800, fontSize: '11px', letterSpacing: '2px', marginBottom: '8px', textTransform: 'uppercase' }}>SKATE SHOP LOCAL</p>
-          <h1 style={{ fontSize: '32px', fontWeight: 700, marginBottom: '8px', color: '#ffffff', letterSpacing: '-1px' }}>Acceso de clientes</h1>
-          <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Inicia sesión para consultar el catálogo.</p>
-          
-          <div style={{ marginBottom: '14px' }}>
-            <input 
-              value={usuario} 
-              onChange={(event) => setUsuario(event.target.value)} 
-              placeholder="Usuario" 
-              style={{ display: 'block', width: '100%', padding: '12px 14px', boxSizing: 'border-box', backgroundColor: '#090a0f', border: '1px solid #27272a', borderRadius: '6px', color: '#ffffff', fontSize: '14px', outline: 'none' }} 
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <input 
-              type="password" 
-              value={clave} 
-              onChange={(event) => setClave(event.target.value)} 
-              placeholder="Contraseña" 
-              style={{ display: 'block', width: '100%', padding: '12px 14px', boxSizing: 'border-box', backgroundColor: '#090a0f', border: '1px solid #27272a', borderRadius: '6px', color: '#ffffff', fontSize: '14px', outline: 'none' }} 
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            style={{ width: '100%', padding: '12px', backgroundColor: '#f97316', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1.2px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(249, 115, 22, 0.35)', marginBottom: '16px' }}
-          >
-            Entrar
-          </button>
-
-          {errorLogin && <p style={{ color: '#fca5a5', fontSize: '13px', marginBottom: '12px', textAlign: 'center' }}>{errorLogin}</p>}
-          
-          <small style={{ color: '#94a3b8', opacity: 0.6, fontSize: '12px', display: 'block', textAlign: 'center', letterSpacing: '0.3px' }}>Demo local: cliente / cliente123</small>
-        </form>
+      <main className="login-screen">
+        <section className="login-panel">
+          <p className="eyebrow accent">SKATE SHOP LOCAL</p>
+          <h1>Acceso de clientes</h1>
+          <p>Inicia sesión para consultar el catálogo.</p>
+          <form onSubmit={(event) => { event.preventDefault(); iniciarSesion(usuario, clave).then(() => setAutenticado(true)).catch(() => setErrorLogin("Credenciales inválidas")); }}>
+            <input value={usuario} onChange={(event) => setUsuario(event.target.value)} placeholder="Usuario" />
+            <input type="password" value={clave} onChange={(event) => setClave(event.target.value)} placeholder="Contraseña" />
+            <button type="submit">Entrar</button>
+          </form>
+          {errorLogin && <p className="error-message">{errorLogin}</p>}
+          <small>Demo local: cliente / cliente123</small>
+        </section>
       </main>
     );
   }
 
-  // 2. SI NO ESTÁ AUTENTICADO Y NO HA HECHO CLIC EN LOGIN: Muestra el Hero Section principal
-  if (!autenticado && !mostrandoLogin) {
-    return (
-      <div className="app-container">
-        <header className="store-header">
-          <div className="logo-container">
-            <h1 className="app-logo">Skate — Tienda</h1>
-          </div>
-          <nav className="header-nav">
-            <span>Tablas</span>
-            <span>Ruedas</span>
-            <span>Accesorios</span>
-          </nav>
-          <div className="user-actions">
-            <button className="btn-login" onClick={() => setMostrandoLogin(true)}>
-              Iniciar Sesión
-            </button>
-          </div>
-        </header>
-
-        <main className="hero-section">
-          <div className="hero-content">
-            <div className="hero-tagline">
-              <h2>¡Pasión por el asfalto!</h2>
-              <p>Autentica tu cuenta para acceder al mejor material.</p>
-            </div>
-            
-            <div className="login-prompt">
-              <button className="btn-action-large" onClick={() => setMostrandoLogin(true)} style={{ cursor: 'pointer' }}>
-                Iniciar sesión como cliente
-              </button>
-              <p className="login-subtext">Accede a tu cuenta para ver el catálogo completo y ofertas exclusivas.</p>
-            </div>
-          </div>
-        </main>
-
-        <footer className="store-footer">
-          <p>© 2026 Skate — Tienda. Todos los derechos reservados.</p>
-        </footer>
-      </div>
-    );
-  }
-
-  // 3. SI YA ESTÁ AUTENTICADO: Muestra el catálogo de productos completo
   const modelos = useMemo(
     () => ["Todos", ...Array.from(new Set(skates.map((skate) => skate.modelo)))],
     [skates],
