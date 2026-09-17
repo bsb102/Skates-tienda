@@ -1,17 +1,16 @@
-import { fetchAuthSession } from "aws-amplify/auth";
 import { config } from "./config";
 
 export interface Skate {
   id: number;
   modelo: string;
   marca: string;
-  medida: number;
+  medida: number | null;
+  wheelbase: number | null;
   stock: number;
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const session = await fetchAuthSession();
-  const token = session.tokens?.accessToken?.toString();
+  const token = localStorage.getItem("skates-token");
 
   return fetch(`${config.apiUrl}${path}`, {
     ...options,
