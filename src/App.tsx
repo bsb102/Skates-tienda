@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { crearTransaccionWebpay, obtenerCatalogo, obtenerPerfil, type Skate, type Usuario } from "./api";
+import { obtenerCatalogo, obtenerPerfil, type Skate, type Usuario } from "./api";
 import { cerrarSesion, iniciarSesion } from "./auth";
 import "./App.css";
 
@@ -43,7 +43,6 @@ function mostrarPrecioClp(precio: number): string {
 }
 
 function App() {
-  // 1. TODOS LOS HOOKS DECLARADOS AL INICIO (Sin saltos ni retornos previos)
   const [skates, setSkates] = useState<Skate[]>([]);
   const [modeloSeleccionado, setModeloSeleccionado] = useState("Todos");
   const [cargando, setCargando] = useState(true);
@@ -60,6 +59,41 @@ function App() {
   const [procesandoPago, setProcesandoPago] = useState(false);
   const [resultadoPago, setResultadoPago] = useState<string | null>(null);
   const [errorPago, setErrorPago] = useState<string | null>(null);
+
+  // Capturar el token_ws cuando Transbank redirige de vuelta al frontend
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenWs = params.get("token_ws");
+
+    if (tokenWs) {
+      setProcesandoPago(true);
+      fetch(`http://localhost:8080/api/pago/commit?token_ws=${tokenWs}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("skates-token")}`
+        }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.completed) {
+            setResultadoPago(`¡Pago realizado con éxito! Orden: ${data.buyOrder}. Stock actualizado.`);
+            setCarrito([]); // Vacía el carrito localmente
+            setMostrandoCarrito(true); // Abre el panel para mostrar el mensaje de éxito
+          } else {
+            setErrorPago(data.message || "La transacción fue rechazada.");
+            setMostrandoCarrito(true);
+          }
+        })
+        .catch(() => {
+          setErrorPago("Error al confirmar la transacción con el servidor.");
+          setMostrandoCarrito(true);
+        })
+        .finally(() => {
+          setProcesandoPago(false);
+          window.history.replaceState({}, document.title, window.location.pathname); // Limpia la URL
+        });
+    }
+  }, []);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -139,29 +173,56 @@ function App() {
     setResultadoPago(null);
 
     try {
-      const transaccion = await crearTransaccionWebpay(carrito, totalCarrito, usuarioActual);
-      const formulario = document.createElement("form");
-      formulario.method = "POST";
-      formulario.action = transaccion.url;
-      formulario.style.display = "none";
+      const itemsFormateados = carrito.map(skate => ({
+        skateId: skate.id,
+        quantity: 1 
+      }));
 
-      const token = document.createElement("input");
-      token.type = "hidden";
-      token.name = "token_ws";
-      token.value = transaccion.token;
-      formulario.appendChild(token);
-      document.body.appendChild(formulario);
-      formulario.submit();
+      const response = await fetch("http://localhost:8080/api/pago/iniciar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("skates-token")}`
+        },
+        body: JSON.stringify({
+          amount: totalCarrito,
+          items: itemsFormateados
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("El servidor rechazó la transacción. Verifica tu sesión o los productos.");
+      }
+
+      const transaccion = await response.json();
+
+      if (transaccion.token && transaccion.url) {
+        const formulario = document.createElement("form");
+        formulario.method = "POST";
+        formulario.action = transaccion.url;
+        formulario.style.display = "none";
+
+        const token = document.createElement("input");
+        token.type = "hidden";
+        token.name = "token_ws";
+        token.value = transaccion.token;
+        
+        formulario.appendChild(token);
+        document.body.appendChild(formulario);
+        formulario.submit();
+      } else {
+        throw new Error("Respuesta inválida desde Transbank");
+      }
+
     } catch (error) {
-      setErrorPago(error instanceof Error ? error.message : "No se pudo procesar el pago");
-    } finally {
+      const mensajeReal = error instanceof Error ? error.message : "No se pudo procesar el pago";
+      setErrorPago(mensajeReal);
       setProcesandoPago(false);
     }
   };
 
   return (
     <div className="app-container">
-      {/* Modal de Inicio de Sesión superpuesto de forma limpia */}
       {mostrandoLogin && !autenticado && (
         <div className="login-overlay">
           <form onSubmit={handleLoginSubmit} className="login-card">
@@ -268,9 +329,30 @@ function App() {
               <span>{perfil?.email || "Cuenta de cliente autenticada"}</span>
             </div>
 
-            {carrito.length === 0 ? (
+            {/* Mensajes de éxito o error de pago */}
+            {resultadoPago && (
+              <div style={{ padding: '16px', background: '#052e16', border: '1px solid #10b981', color: '#6ee7b7', borderRadius: '8px', margin: '16px 0', textAlign: 'center' }}>
+                <h3 style={{ margin: '0 0 6px 0', color: '#34d399' }}>¡Transacción Exitosa!</h3>
+                <p style={{ margin: 0, fontSize: '13px' }}>{resultadoPago}</p>
+                <button 
+                  type="button" 
+                  onClick={() => setResultadoPago(null)}
+                  style={{ marginTop: '10px', padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Aceptar
+                </button>
+              </div>
+            )}
+
+            {errorPago && (
+              <div style={{ padding: '14px', background: '#450a0a', border: '1px solid #ef4444', color: '#fca5a5', borderRadius: '8px', margin: '16px 0', textAlign: 'center' }}>
+                <p style={{ margin: 0, fontSize: '13px' }}>{errorPago}</p>
+              </div>
+            )}
+
+            {carrito.length === 0 && !resultadoPago ? (
               <p className="cart-empty">Tu carrito está vacío. Agrega una tabla desde el catálogo.</p>
-            ) : (
+            ) : carrito.length > 0 && (
               <>
                 <div className="cart-items">
                   {carrito.map((skate) => (
@@ -303,14 +385,11 @@ function App() {
                 <form className="payment-form" onSubmit={completarCompra}>
                   <small>Serás redirigido al ambiente de integración de Webpay. No ingreses datos reales.</small>
                   <button type="submit" className="pay-button" disabled={procesandoPago}>
-                    {procesandoPago ? "Conectando con Webpay..." : "Pagar con Webpay"}
+                    {procesandoPago ? "Procesando pago..." : "Pagar con Webpay"}
                   </button>
                 </form>
               </>
             )}
-
-            {resultadoPago && <p className="payment-success">{resultadoPago}</p>}
-            {errorPago && <p className="error-message">{errorPago}</p>}
           </section>
         </div>
       )}
