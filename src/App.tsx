@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { obtenerCatalogo, type Skate } from "./api";
+import { crearTransaccionWebpay, obtenerCatalogo, obtenerPerfil, type Skate, type Usuario } from "./api";
 import { cerrarSesion, iniciarSesion } from "./auth";
 import "./App.css";
 
@@ -27,6 +27,21 @@ const SLIDES = [
   }
 ];
 
+const PRECIOS_REFERENCIA_CLP = [54990, 64990, 69990, 79990, 89990];
+const formatoClp = new Intl.NumberFormat("es-CL", {
+  style: "currency",
+  currency: "CLP",
+  maximumFractionDigits: 0,
+});
+
+function obtenerPrecioClp(skate: Skate): number {
+  return skate.precio ?? PRECIOS_REFERENCIA_CLP[Math.abs(skate.id - 1) % PRECIOS_REFERENCIA_CLP.length];
+}
+
+function mostrarPrecioClp(precio: number): string {
+  return formatoClp.format(precio);
+}
+
 function App() {
   // 1. TODOS LOS HOOKS DECLARADOS AL INICIO (Sin saltos ni retornos previos)
   const [skates, setSkates] = useState<Skate[]>([]);
@@ -40,6 +55,11 @@ function App() {
   const [mostrandoLogin, setMostrandoLogin] = useState(false);
   const [bannerActual, setBannerActual] = useState(0);
   const [carrito, setCarrito] = useState<Skate[]>([]);
+  const [mostrandoCarrito, setMostrandoCarrito] = useState(false);
+  const [perfil, setPerfil] = useState<Usuario | null>(null);
+  const [procesandoPago, setProcesandoPago] = useState(false);
+  const [resultadoPago, setResultadoPago] = useState<string | null>(null);
+  const [errorPago, setErrorPago] = useState<string | null>(null);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -47,6 +67,17 @@ function App() {
     }, 5000);
     return () => clearInterval(intervalo);
   }, []);
+
+  useEffect(() => {
+    if (!autenticado) {
+      setPerfil(null);
+      return;
+    }
+
+    obtenerPerfil()
+      .then(setPerfil)
+      .catch(() => setPerfil({ username: usuario || "cliente" }));
+  }, [autenticado, usuario]);
 
   useEffect(() => {
     obtenerCatalogo()
@@ -83,6 +114,8 @@ function App() {
     : skates.filter((skate) => skate.modelo === modeloSeleccionado);
 
   const slideActual = SLIDES[bannerActual];
+  const totalCarrito = carrito.reduce((total, skate) => total + obtenerPrecioClp(skate), 0);
+  const usuarioActual = perfil ?? { username: usuario || "cliente" };
 
   const agregarAlCarrito = (skate: Skate) => {
     if (!autenticado) {
@@ -93,6 +126,37 @@ function App() {
     setCarrito((actual) => actual.some((item) => item.id === skate.id)
       ? actual
       : [...actual, skate]);
+  };
+
+  const eliminarDelCarrito = (skateId: number) => {
+    setCarrito((actual) => actual.filter((item) => item.id !== skateId));
+  };
+
+  const completarCompra = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setProcesandoPago(true);
+    setErrorPago(null);
+    setResultadoPago(null);
+
+    try {
+      const transaccion = await crearTransaccionWebpay(carrito, totalCarrito, usuarioActual);
+      const formulario = document.createElement("form");
+      formulario.method = "POST";
+      formulario.action = transaccion.url;
+      formulario.style.display = "none";
+
+      const token = document.createElement("input");
+      token.type = "hidden";
+      token.name = "token_ws";
+      token.value = transaccion.token;
+      formulario.appendChild(token);
+      document.body.appendChild(formulario);
+      formulario.submit();
+    } catch (error) {
+      setErrorPago(error instanceof Error ? error.message : "No se pudo procesar el pago");
+    } finally {
+      setProcesandoPago(false);
+    }
   };
 
   return (
@@ -161,7 +225,7 @@ function App() {
           {autenticado ? (
             <button 
               type="button" 
-              onClick={() => { cerrarSesion(); setAutenticado(false); setCarrito([]); }}
+              onClick={() => { cerrarSesion(); setAutenticado(false); setCarrito([]); setMostrandoCarrito(false); }}
               style={{ fontSize: '11px', padding: '8px 16px', background: 'transparent', border: '1px solid #27272a', color: '#94a3b8', borderRadius: '8px', cursor: 'pointer', textTransform: 'uppercase' }}
             >
               Salir
@@ -180,8 +244,76 @@ function App() {
             <span>Carrito</span>
             <strong>{carrito.length}</strong>
           </div>
+          {autenticado && (
+            <button type="button" className="cart-open-button" onClick={() => setMostrandoCarrito(true)}>
+              Ver carrito
+            </button>
+          )}
         </div>
       </header>
+
+      {mostrandoCarrito && autenticado && (
+        <div className="cart-overlay">
+          <section className="cart-panel" aria-labelledby="cart-title">
+            <div className="cart-panel-header">
+              <div>
+                <p className="eyebrow accent">CHECKOUT DEMO</p>
+                <h2 id="cart-title">Tu carrito</h2>
+              </div>
+              <button type="button" className="cart-close-button" onClick={() => setMostrandoCarrito(false)} aria-label="Cerrar carrito">×</button>
+            </div>
+
+            <div className="customer-summary">
+              <strong>{perfil?.nombre || usuarioActual.username}</strong>
+              <span>{perfil?.email || "Cuenta de cliente autenticada"}</span>
+            </div>
+
+            {carrito.length === 0 ? (
+              <p className="cart-empty">Tu carrito está vacío. Agrega una tabla desde el catálogo.</p>
+            ) : (
+              <>
+                <div className="cart-items">
+                  {carrito.map((skate) => (
+                    <div className="cart-item" key={skate.id}>
+                      <div>
+                        <strong>{skate.marca}</strong>
+                        <span>{skate.modelo} · {skate.medida ? `${skate.medida}"` : `WB ${skate.wheelbase}"`}</span>
+                      </div>
+                      <div className="cart-item-actions">
+                        <strong>{mostrarPrecioClp(obtenerPrecioClp(skate))}</strong>
+                        <button
+                          type="button"
+                          className="cart-remove-button"
+                          onClick={() => eliminarDelCarrito(skate.id)}
+                          aria-label={`Eliminar ${skate.marca} del carrito`}
+                          title="Eliminar del carrito"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="cart-total">
+                  <span>Total simulado</span>
+                  <strong>{mostrarPrecioClp(totalCarrito)}</strong>
+                </div>
+
+                <form className="payment-form" onSubmit={completarCompra}>
+                  <small>Serás redirigido al ambiente de integración de Webpay. No ingreses datos reales.</small>
+                  <button type="submit" className="pay-button" disabled={procesandoPago}>
+                    {procesandoPago ? "Conectando con Webpay..." : "Pagar con Webpay"}
+                  </button>
+                </form>
+              </>
+            )}
+
+            {resultadoPago && <p className="payment-success">{resultadoPago}</p>}
+            {errorPago && <p className="error-message">{errorPago}</p>}
+          </section>
+        </div>
+      )}
 
       {/* Carrusel Dinámico Superior */}
       <section style={{ position: 'relative', width: '100%', height: '380px', overflow: 'hidden', backgroundColor: '#090a0f', borderBottom: '1px solid #27272a' }}>
@@ -285,6 +417,7 @@ function App() {
                 <div className="product-details" style={{ marginTop: '24px' }}>
                   <span>{skate.medida ? `${skate.medida}"` : `WB ${skate.wheelbase}"`}</span>
                   <span>{skate.stock} en stock</span>
+                  <strong className="product-price">{mostrarPrecioClp(obtenerPrecioClp(skate))}</strong>
                 </div>
 
                 <button
