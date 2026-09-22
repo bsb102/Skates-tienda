@@ -5,22 +5,25 @@ import "./App.css";
 
 const SLIDES = [
   {
-    image: "https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?auto=format&fit=crop&w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1723236900134-63561e5832b3?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c2thdGVib2FyZGluZ3xlbnwwfHwwfHx8MA%3D%3D",
     tag: "NUEVA COLECCIÓN 2026",
     title: "DOMINA EL ASFALTO.",
-    description: "Diseño, resistencia y máxima pop. Selecciona tu estilo de tabla ideal y arma tu setup perfecto."
+    description: "Diseño, resistencia y máxima pop. Selecciona tu estilo de tabla ideal y arma tu setup perfecto.",
+    details: ["Madera de alta resistencia", "Pop consistente", "Setup listo para calle"]
   },
   {
-    image: "https://images.unsplash.com/photo-1517649763962-0c6232660102?auto=format&fit=crop&w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1591311337241-cecfd26f1da1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fHNrYXRlYm9hcmRpbmd8ZW58MHx8MHx8fDA%3D",
     tag: "ESTILO URBAN STREET",
     title: "TRUCOS SIN LÍMITES.",
-    description: "Tablas construidas con madera de alta durabilidad preparadas para soportar el castigo diario de la calle."
+    description: "Tablas construidas con madera de alta durabilidad preparadas para soportar el castigo diario de la calle.",
+    details: ["Control en cada truco", "Diseño para street", "Respuesta estable"]
   },
   {
-    image: "https://images.unsplash.com/photo-1547447134-cd3f5c616ae3?auto=format&fit=crop&w=1200&q=80",
+    image: "https://images.unsplash.com/photo-1589542425426-2460d8243b58?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mjl8fHNrYXRlYm9hcmRpbmd8ZW58MHx8MHx8fDA%3D",
     tag: "ALTO RENDIMIENTO",
     title: "TECNOLOGÍA Y CONTROL.",
-    description: "Geometrías optimizadas para un mejor pop, mayor estabilidad en rampa y un control absoluto en cada descenso."
+    description: "Geometrías optimizadas para un mejor pop, mayor estabilidad en rampa y un control absoluto en cada descenso.",
+    details: ["Estabilidad en rampa", "Giro preciso", "Construcción durable"]
   }
 ];
 
@@ -36,6 +39,7 @@ function App() {
   const [errorLogin, setErrorLogin] = useState<string | null>(null);
   const [mostrandoLogin, setMostrandoLogin] = useState(false);
   const [bannerActual, setBannerActual] = useState(0);
+  const [carrito, setCarrito] = useState<Skate[]>([]);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -79,6 +83,17 @@ function App() {
     : skates.filter((skate) => skate.modelo === modeloSeleccionado);
 
   const slideActual = SLIDES[bannerActual];
+
+  const agregarAlCarrito = (skate: Skate) => {
+    if (!autenticado) {
+      setMostrandoLogin(true);
+      return;
+    }
+
+    setCarrito((actual) => actual.some((item) => item.id === skate.id)
+      ? actual
+      : [...actual, skate]);
+  };
 
   return (
     <div className="app-container">
@@ -146,7 +161,7 @@ function App() {
           {autenticado ? (
             <button 
               type="button" 
-              onClick={() => { cerrarSesion(); setAutenticado(false); }}
+              onClick={() => { cerrarSesion(); setAutenticado(false); setCarrito([]); }}
               style={{ fontSize: '11px', padding: '8px 16px', background: 'transparent', border: '1px solid #27272a', color: '#94a3b8', borderRadius: '8px', cursor: 'pointer', textTransform: 'uppercase' }}
             >
               Salir
@@ -160,6 +175,11 @@ function App() {
               Iniciar Sesión
             </button>
           )}
+          <div className="cart-summary" aria-label="Carrito de compra">
+            <span className="cart-icon" aria-hidden="true">+</span>
+            <span>Carrito</span>
+            <strong>{carrito.length}</strong>
+          </div>
         </div>
       </header>
 
@@ -181,18 +201,24 @@ function App() {
           />
         ))}
 
-        <div style={{ position: 'relative', zIndex: 2, width: 'min(1240px, 100% - 64px)', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="hero-copy" style={{ position: 'relative', zIndex: 2, width: 'min(1240px, 100% - 64px)', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
           <span style={{ color: '#f97316', fontSize: '12px', fontWeight: 800, letterSpacing: '3px', textTransform: 'uppercase' }}>
             {slideActual.tag}
           </span>
           <h2 style={{ color: '#ffffff', fontSize: 'clamp(32px, 5vw, 52px)', fontWeight: 900, margin: '8px 0 12px', letterSpacing: '-1.5px' }}>
             {slideActual.title}
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: '15px', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
+          <p style={{ color: '#cbd5e1', fontSize: '15px', maxWidth: '620px', margin: 0, lineHeight: 1.55 }}>
             {slideActual.description}
           </p>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '24px' }}>
+          <div className="hero-details" aria-label="Características de la colección">
+            {slideActual.details.map((detail) => (
+              <span key={detail}>{detail}</span>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '22px' }}>
             {SLIDES.map((_, idx) => (
               <button
                 key={idx}
@@ -260,6 +286,20 @@ function App() {
                   <span>{skate.medida ? `${skate.medida}"` : `WB ${skate.wheelbase}"`}</span>
                   <span>{skate.stock} en stock</span>
                 </div>
+
+                <button
+                  type="button"
+                  className="cart-button"
+                  disabled={!autenticado || carrito.some((item) => item.id === skate.id)}
+                  onClick={() => agregarAlCarrito(skate)}
+                  title={autenticado ? "Agregar esta tabla al carrito" : "Inicia sesión para agregar productos"}
+                >
+                  {!autenticado
+                    ? "Inicia sesión para comprar"
+                    : carrito.some((item) => item.id === skate.id)
+                      ? "Agregado al carrito"
+                      : "Agregar al carrito"}
+                </button>
               </article>
             ))}
           </section>
