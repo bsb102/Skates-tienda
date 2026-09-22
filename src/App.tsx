@@ -13,33 +13,44 @@ function App() {
   const [autenticado, setAutenticado] = useState(() => Boolean(localStorage.getItem("skates-token")));
   const [errorLogin, setErrorLogin] = useState<string | null>(null);
 
-  // Estado para alternar entre el Hero Section y el formulario de login de clientes
+  // Estado para controlar si se abre la ventana de login
   const [mostrandoLogin, setMostrandoLogin] = useState(false);
 
+  // Carga automática del catálogo para todos los usuarios (sin requerir login previo)
   useEffect(() => {
-    if (!autenticado) return;
     obtenerCatalogo()
-      .then(setSkates)
-      .catch(() => setError("No se pudo cargar el catálogo. Verifica que el backend esté ejecutándose."))
-      .finally(() => setCargando(false));
-  }, [autenticado]);
+      .then((data) => {
+        setSkates(data);
+        setError(null);
+      })
+      .catch(() => {
+        setError("No se pudo cargar el catálogo. Verifica que el backend esté ejecutándose.");
+      })
+      .finally(() => {
+        setCargando(false);
+      });
+  }, []);
 
   const handleLoginSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     iniciarSesion(usuario, clave)
-      .then(() => setAutenticado(true))
+      .then(() => {
+        setAutenticado(true);
+        setMostrandoLogin(false);
+        setErrorLogin(null);
+      })
       .catch(() => setErrorLogin("Credenciales inválidas"));
   };
 
-  // 1. VISTA DEL FORMULARIO DE ACCESO DE CLIENTES
-  if (!autenticado && mostrandoLogin) {
+  // 1. SI EL USUARIO HIZO CLIC EN INICIAR SESIÓN: Muestra el formulario modal
+  if (mostrandoLogin && !autenticado) {
     return (
       <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', backgroundColor: '#090a0f', color: '#94a3b8' }}>
         <form 
           onSubmit={handleLoginSubmit} 
           style={{ width: 'min(420px, 90vw)', padding: '40px', backgroundColor: '#13151a', borderRadius: '14px', border: '1px solid rgba(249, 115, 22, 0.4)', boxShadow: '0 25px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(249, 115, 22, 0.1)', boxSizing: 'border-box', position: 'relative' }}
         >
-          {/* Botón de volver estilizado */}
+          {/* Botón de volver */}
           <button 
             type="button" 
             onClick={() => setMostrandoLogin(false)}
@@ -65,7 +76,7 @@ function App() {
 
           <p className="eyebrow accent" style={{ marginBottom: '8px' }}>SKATE SHOP LOCAL</p>
           <h1 style={{ fontSize: '32px', fontWeight: 700, marginBottom: '8px', color: '#ffffff', letterSpacing: '-1px' }}>Acceso de clientes</h1>
-          <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Inicia sesión para consultar el catálogo.</p>
+          <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px' }}>Inicia sesión para gestionar tu cuenta.</p>
           
           <div style={{ marginBottom: '14px' }}>
             <input 
@@ -101,50 +112,7 @@ function App() {
     );
   }
 
-  // 2. VISTA PRINCIPAL (HERO SECTION URBANO)
-  if (!autenticado && !mostrandoLogin) {
-    return (
-      <div className="app-container">
-        <header className="store-header">
-          <div className="logo-container">
-            <h1 className="app-logo">Skate — Tienda</h1>
-          </div>
-          <nav className="header-nav">
-            <span>Tablas</span>
-            <span>Ruedas</span>
-            <span>Accesorios</span>
-          </nav>
-          <div className="user-actions">
-            <button className="btn-login" onClick={() => setMostrandoLogin(true)}>
-              Iniciar Sesión
-            </button>
-          </div>
-        </header>
-
-        <main className="hero-section">
-          <div className="hero-content">
-            <div className="hero-tagline">
-              <h2>¡Pasión por el asfalto!</h2>
-              <p>Autentica tu cuenta para acceder al mejor material.</p>
-            </div>
-            
-            <div className="login-prompt">
-              <button className="btn-action-large" onClick={() => setMostrandoLogin(true)} style={{ cursor: 'pointer' }}>
-                Iniciar sesión como cliente
-              </button>
-              <p className="login-subtext">Accede a tu cuenta para ver el catálogo completo y ofertas exclusivas.</p>
-            </div>
-          </div>
-        </main>
-
-        <footer className="store-footer">
-          <p>© 2026 Skate — Tienda. Todos los derechos reservados.</p>
-        </footer>
-      </div>
-    );
-  }
-
-  // 3. VISTA DEL CATÁLOGO (AUTENTICADO)
+  // 2. VISTA PRINCIPAL: EL CATÁLOGO VISIBLE PARA TODOS (CON BOTÓN DE LOGIN / SALIR EN EL HEADER)
   const modelos = useMemo(
     () => ["Todos", ...Array.from(new Set(skates.map((skate) => skate.modelo)))],
     [skates],
@@ -159,12 +127,32 @@ function App() {
       <header className="store-header">
         <div className="logo-container">
           <p className="eyebrow">SKATE SHOP / 2026</p>
-          <h1 className="app-logo">Skate - Tienda</h1>
+          <h1 className="app-logo">Skate — Tienda</h1>
         </div>
-        <div className="catalog-counter">
-          <strong>{skates.length}</strong>
-          <span>tablas disponibles</span>
-          <button type="button" onClick={() => { cerrarSesion(); setAutenticado(false); setMostrandoLogin(false); }}>Salir</button>
+        <div className="catalog-counter" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '20px' }}>
+          <div>
+            <strong>{skates.length}</strong>
+            <span> tablas disponibles</span>
+          </div>
+          
+          {/* Botón dinámico: Muestra "Iniciar Sesión" si no está logueado, o "Salir" si ya ingresó */}
+          {autenticado ? (
+            <button 
+              type="button" 
+              onClick={() => { cerrarSesion(); setAutenticado(false); }}
+              style={{ fontSize: '11px', padding: '6px 14px', background: 'transparent', border: '1px solid #27272a', color: '#94a3b8', borderRadius: '6px', cursor: 'pointer', textTransform: 'uppercase' }}
+            >
+              Salir
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              onClick={() => setMostrandoLogin(true)}
+              style={{ fontSize: '11px', padding: '8px 16px', background: '#f97316', border: 'none', color: '#fff', fontWeight: 700, borderRadius: '6px', cursor: 'pointer', textTransform: 'uppercase' }}
+            >
+              Iniciar Sesión
+            </button>
+          )}
         </div>
       </header>
 
@@ -173,7 +161,7 @@ function App() {
           <div>
             <p className="eyebrow accent">CATALOGO EN VIVO</p>
             <h2>Encuentra tu próxima línea.</h2>
-            <p className="intro-copy">Productos cargados desde el inventario del backend.</p>
+            <p className="intro-copy">Inventario sincronizado directamente con el backend.</p>
           </div>
           <div className="model-filters" aria-label="Filtrar por modelo">
             {modelos.map((modelo) => (
@@ -189,10 +177,11 @@ function App() {
           </div>
         </section>
 
-        {cargando && <p className="status-message">Cargando inventario...</p>}
-        {error && <p className="status-message error-message">{error}</p>}
+        {cargando && <p className="status-message">Conectando con el backend y cargando inventario...</p>}
+        {error && <p className="status-message error-message" style={{ color: '#fca5a5' }}>{error}</p>}
+        
         {!cargando && !error && skatesFiltrados.length === 0 && (
-          <p className="status-message">No hay productos para este filtro.</p>
+          <p className="status-message">No hay productos disponibles para este filtro.</p>
         )}
 
         {!cargando && !error && skatesFiltrados.length > 0 && (
